@@ -1,0 +1,45 @@
+on:
+  push:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.os }}
+
+    timeout-minutes: 5
+
+    steps:
+      # Ensure latest docker
+      - run: |
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+          sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu  $(lsb_release -cs)  stable"
+          sudo apt-get update
+          sudo apt-get install docker-ce
+      - run: docker --version
+
+      # Create Dockerfile
+      - run: |
+          cat > Dockerfile <<'EOF'
+          FROM node:24.12-alpine
+
+          ENV PNPM_HOME="/pnpm"
+          ENV PATH="$PNPM_HOME/bin:$PATH"
+
+          RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" sh -
+          RUN pnpm --version
+          RUN node --version
+
+          WORKDIR /app
+          RUN echo '{ "packageManager": "pnpm@11.26.0" }' > package.json
+          RUN pnpm --version
+          EOF
+      - run: cat Dockerfile
+
+      # Attempt build
+      - run: docker build --no-cache --progress=plain .
